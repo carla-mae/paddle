@@ -2,42 +2,46 @@
 require_once __DIR__ . '/src/Exception.php';
 require_once __DIR__ . '/src/PHPMailer.php';
 require_once __DIR__ . '/src/SMTP.php';
+require_once __DIR__ . '/../config/env.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 function send_smtp_mail(string $toEmail, string $toName, string $subject, string $bodyText): bool {
+    $envHost = trim(getenv('MAIL_HOST') ?: getenv('SMTP_HOST') ?: '');
+    $envUser = trim(getenv('MAIL_USERNAME') ?: getenv('SMTP_USERNAME') ?: '');
+    $envPass = str_replace(' ', '', trim(getenv('MAIL_APP_PASSWORD') ?: getenv('MAIL_PASSWORD') ?: ''));
+    $envPort = trim(getenv('MAIL_PORT') ?: getenv('SMTP_PORT') ?: '');
+    $envEncryption = trim(getenv('MAIL_ENCRYPTION') ?: getenv('SMTP_ENCRYPTION') ?: '');
+    $envFromName = trim(getenv('MAIL_FROM_NAME') ?: getenv('SMTP_FROM_NAME') ?: '');
+    $envFromAddress = trim(getenv('MAIL_FROM_ADDRESS') ?: getenv('SMTP_FROM_ADDRESS') ?: '');
+
     $configPath = __DIR__ . '/mail_config.php';
+    $config = file_exists($configPath) ? require $configPath : [];
 
-    if (!file_exists($configPath)) {
-        error_log("Mailer Error: mail_config.php is missing. Create it with your Gmail credentials.");
-        return false;
-    }
-
-    $config = require $configPath;
-
-    $username = trim($config['smtp_username'] ?? '');
-    $password = str_replace(' ', '', trim($config['smtp_password'] ?? ''));
+    $host = $envHost !== '' ? $envHost : ($config['smtp_host'] ?? 'smtp.gmail.com');
+    $username = $envUser !== '' ? $envUser : trim($config['smtp_username'] ?? '');
+    $password = $envPass !== '' ? $envPass : str_replace(' ', '', trim($config['smtp_password'] ?? ''));
+    $port = $envPort !== '' ? (int)$envPort : 587;
+    $encryption = $envEncryption !== '' ? $envEncryption : 'tls';
+    $fromName = $envFromName !== '' ? $envFromName : ($config['from_name'] ?? 'PaddleGround');
+    $fromAddress = $envFromAddress !== '' ? $envFromAddress : $username;
 
     if ($username === '' || $password === '') {
-        error_log("Mailer Error: smtp_username or smtp_password is empty in mail_config.php.");
+        error_log("Mailer Error: SMTP username or password is missing. Set MAIL_USERNAME and MAIL_APP_PASSWORD in Render, or configure PHPMailer/mail_config.php.");
         return false;
-    }
-
-    if (strlen($password) !== 16) {
-        error_log("Mailer Warning: SMTP password is " . strlen($password) . " chars — expected 16. Check mail_config.php for a copy-paste mistake.");
     }
 
     $mail = new PHPMailer(true);
 
     try {
         $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
+        $mail->Host       = $host;
         $mail->SMTPAuth   = true;
         $mail->Username   = $username;
         $mail->Password   = $password;
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = 587;
+        $mail->SMTPSecure = (strtolower($encryption) === 'ssl') ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = $port;
 
         $mail->SMTPOptions = [
             'ssl' => [
@@ -47,7 +51,7 @@ function send_smtp_mail(string $toEmail, string $toName, string $subject, string
             ]
         ];
 
-        $mail->setFrom($username, $config['from_name'] ?? 'PaddleGround');
+        $mail->setFrom($fromAddress ?: $username, $fromName ?: 'PaddleGround');
         $mail->addAddress($toEmail, $toName);
 
         $mail->isHTML(false);
@@ -58,7 +62,7 @@ function send_smtp_mail(string $toEmail, string $toName, string $subject, string
         return true;
 
     } catch (Exception $e) {
-        $errorMsg = $mail->ErrorInfo;
+        $errorMsg = $mail->ErrorInfo ?: $e->getMessage();
         error_log("Mailer Error: {$errorMsg}");
 
         file_put_contents(
