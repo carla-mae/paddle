@@ -5,12 +5,17 @@
 // which is what was silently kicking you back to the login screen.
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.gc_maxlifetime', 86400);
+    $isSecureRequest = (
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+        (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') ||
+        (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
+    );
     session_set_cookie_params([
         'lifetime' => 86400,   // 1 day, instead of 0 (0 = "until browser closes",
                                 // which some mobile browsers treat as expired
                                 // the moment the app goes to background/gets killed)
         'path'     => '/',
-        'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'secure'   => $isSecureRequest,
         'httponly' => true,
         'samesite' => 'Lax',
     ]);

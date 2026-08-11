@@ -38,13 +38,18 @@ if (session_status() === PHP_SESSION_NONE) {
     // session — cookie attributes are locked in the moment the cookie is
     // first issued, so a mismatch between login.php and this file can cause
     // the session to appear to "not stick" across pages.
+    $isSecureRequest = (
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+        (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') ||
+        (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
+    );
     session_set_cookie_params([
         'lifetime' => 86400,    // 1 day. (Was 0 = "expires when browser closes",
                                  // but some mobile browsers/OSes treat backgrounding
                                  // or killing the app as "closing the browser,"
                                  // wiping the session unexpectedly.)
         'path'     => '/',
-        'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'secure'   => $isSecureRequest,
         'httponly' => true,     // JS can't read the cookie
         'samesite' => 'Lax',
     ]);

@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $respond_error('Receipt file is too large (max 5MB).');
         }
 
-        $destDir = '../uploads/receipts/';
+        $destDir = __DIR__ . '/../uploads/receipts/';
         if (!is_dir($destDir)) { mkdir($destDir, 0755, true); }
 
         $filename = 'receipt_' . $booking_id . '_' . time() . '.' . $ext;
@@ -201,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $respond_error('Receipt file is too large (max 5MB).');
         }
 
-        $destDir = '../uploads/receipts/';
+        $destDir = __DIR__ . '/../uploads/receipts/';
         if (!is_dir($destDir)) { mkdir($destDir, 0755, true); }
 
         $filename = 'receipt_' . $booking_id . '_' . time() . '.' . $ext;

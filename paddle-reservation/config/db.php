@@ -13,6 +13,12 @@ if (!$conn) {
     die("Failed to initialize database connection.");
 }
 
+$dbSsl = $_ENV['DB_SSL'] ?? $_SERVER['DB_SSL'] ?? getenv('DB_SSL');
+$useSsl = $dbSsl !== null && $dbSsl !== ''
+    ? filter_var($dbSsl, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+    : !in_array($host, ['localhost', '127.0.0.1'], true);
+$sslFlag = $useSsl ? MYSQLI_CLIENT_SSL : 0;
+
 if (!mysqli_real_connect(
     $conn,
     $host,
@@ -21,7 +27,7 @@ if (!mysqli_real_connect(
     $dbname,
     (int)$port,
     null,
-    MYSQLI_CLIENT_SSL
+    $sslFlag
 )) {
     die("Database connection failed: " . mysqli_connect_error());
 }

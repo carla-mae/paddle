@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refund_payment_id']))
         die('Invalid file type. Please upload a JPG, PNG, or WEBP image.');
     }
 
-    $uploadDir = '../uploads/refunds/';
+    $uploadDir = __DIR__ . '/../uploads/refunds/';
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0755, true);
     }

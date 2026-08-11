@@ -37,8 +37,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             // Build the reset link. Adjust the domain/path here if your
             // local setup differs (e.g. if it's not under /paddle-reservation/).
-            $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-            $host = $_SERVER['HTTP_HOST'];
+            $isSecureRequest = (
+                (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+                (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') ||
+                (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
+            );
+            $protocol = $isSecureRequest ? 'https://' : 'http://';
+            $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? 'localhost';
             $basePath = dirname(dirname($_SERVER['SCRIPT_NAME'])); // one level up from /auth
             $resetLink = "{$protocol}{$host}{$basePath}/auth/reset_password.php?token={$token}";
 

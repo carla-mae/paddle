@@ -31,16 +31,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } else {
         $stmt->close();
 
-        $target_dir = "../uploads/receipts/";
+        $target_dir = __DIR__ . '/../uploads/receipts/';
         if (!is_dir($target_dir)) { mkdir($target_dir, 0755, true); }
         $file_name = time() . "_" . basename($_FILES["receipt"]["name"]);
         $target_file = $target_dir . $file_name;
 
         if (move_uploaded_file($_FILES["receipt"]["tmp_name"], $target_file)) {
+            $receiptPath = 'uploads/receipts/' . $file_name;
             $stmt = $conn->prepare(
                 "INSERT INTO payments (booking_id, method, receipt_path, amount) VALUES (?, ?, ?, ?)"
             );
-            $stmt->bind_param("issd", $booking_id, $method, $file_name, $amount);
+            $stmt->bind_param("issd", $booking_id, $method, $receiptPath, $amount);
             $stmt->execute();
             $stmt->close();
             $message = 'Receipt uploaded. Awaiting verification.';
