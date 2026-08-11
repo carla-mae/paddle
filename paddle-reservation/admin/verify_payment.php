@@ -48,7 +48,12 @@ if (isset($_GET['verify'])) {
               . "Your reservation is now confirmed. See you on the court!\n\n"
               . "— PaddleGround Team";
 
-        send_smtp_mail($info['email'], $info['full_name'], $subject, $body);
+        $mailSent = send_smtp_mail($info['email'], $info['full_name'], $subject, $body);
+        if ($mailSent) {
+            error_log("BOOKING EMAIL SENT: payment_id={$payment_id}, email={$info['email']}");
+        } else {
+            error_log("BOOKING EMAIL FAILED: payment_id={$payment_id}, email={$info['email']}");
+        }
     }
 
     header("Location: verify_payment.php");

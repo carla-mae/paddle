@@ -8,16 +8,30 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 function send_smtp_mail(string $toEmail, string $toName, string $subject, string $bodyText): bool {
-    $envHost = trim(getenv('MAIL_HOST') ?: getenv('SMTP_HOST') ?: '');
-    $envUser = trim(getenv('MAIL_USERNAME') ?: getenv('SMTP_USERNAME') ?: '');
-    $envPass = str_replace(' ', '', trim(getenv('MAIL_APP_PASSWORD') ?: getenv('MAIL_PASSWORD') ?: ''));
-    $envPort = trim(getenv('MAIL_PORT') ?: getenv('SMTP_PORT') ?: '');
-    $envEncryption = trim(getenv('MAIL_ENCRYPTION') ?: getenv('SMTP_ENCRYPTION') ?: '');
-    $envFromName = trim(getenv('MAIL_FROM_NAME') ?: getenv('SMTP_FROM_NAME') ?: '');
-    $envFromAddress = trim(getenv('MAIL_FROM_ADDRESS') ?: getenv('SMTP_FROM_ADDRESS') ?: '');
+    $getEnv = function(string $name, string $fallback = ''): string {
+        $value = getenv($name);
+        if ($value !== false && trim($value) !== '') {
+            return trim($value);
+        }
+        if (isset($_ENV[$name]) && trim((string)$_ENV[$name]) !== '') {
+            return trim((string)$_ENV[$name]);
+        }
+        if (isset($_SERVER[$name]) && trim((string)$_SERVER[$name]) !== '') {
+            return trim((string)$_SERVER[$name]);
+        }
+        return $fallback;
+    };
+
+    $envHost = $getEnv('MAIL_HOST', $getEnv('SMTP_HOST', ''));
+    $envUser = $getEnv('MAIL_USERNAME', $getEnv('SMTP_USERNAME', ''));
+    $envPass = str_replace(' ', '', $getEnv('MAIL_APP_PASSWORD', $getEnv('MAIL_PASSWORD', '')));
+    $envPort = $getEnv('MAIL_PORT', $getEnv('SMTP_PORT', ''));
+    $envEncryption = $getEnv('MAIL_ENCRYPTION', $getEnv('SMTP_ENCRYPTION', ''));
+    $envFromName = $getEnv('MAIL_FROM_NAME', $getEnv('SMTP_FROM_NAME', ''));
+    $envFromAddress = $getEnv('MAIL_FROM_ADDRESS', $getEnv('SMTP_FROM_ADDRESS', ''));
 
     $configPath = __DIR__ . '/mail_config.php';
-    $config = file_exists($configPath) ? require $configPath : [];
+    $config = file_exists($configPath) ? (array) require $configPath : [];
 
     $host = $envHost !== '' ? $envHost : ($config['smtp_host'] ?? 'smtp.gmail.com');
     $username = $envUser !== '' ? $envUser : trim($config['smtp_username'] ?? '');
@@ -42,6 +56,8 @@ function send_smtp_mail(string $toEmail, string $toName, string $subject, string
         $mail->Password   = $password;
         $mail->SMTPSecure = (strtolower($encryption) === 'ssl') ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = $port;
+        $mail->CharSet    = 'UTF-8';
+        $mail->isHTML(false);
 
         $mail->SMTPOptions = [
             'ssl' => [
@@ -54,7 +70,6 @@ function send_smtp_mail(string $toEmail, string $toName, string $subject, string
         $mail->setFrom($fromAddress ?: $username, $fromName ?: 'PaddleGround');
         $mail->addAddress($toEmail, $toName);
 
-        $mail->isHTML(false);
         $mail->Subject = $subject;
         $mail->Body    = $bodyText;
 
