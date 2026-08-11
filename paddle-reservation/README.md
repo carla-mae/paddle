@@ -11,6 +11,8 @@ cp .env.example .env
 # edit .env and set DB and MAIL values
 ```
 
+> On Render, set the same variables as environment secrets instead of committing `.env`.
+
 2. Install PHP dependencies (Composer required):
 
 ```bash
