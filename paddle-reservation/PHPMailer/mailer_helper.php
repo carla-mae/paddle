@@ -1,16 +1,14 @@
 <?php
 require_once __DIR__ . '/../config/env.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 
 /**
- * Sends transactional email via Brevo's HTTP API (https://api.brevo.com)
- * instead of raw SMTP. Render (and several other hosts) block outbound
- * SMTP ports (25/465/587) at the network level — "Network is unreachable" —
- * so plain PHPMailer SMTP sending never gets a chance to even reach Gmail.
- * This sends over HTTPS instead, which is never blocked.
- *
- * Same function name + signature as before, so every existing call site
- * (register.php, forgot_password.php, verify_payment.php, etc.) keeps
- * working with zero changes.
+ * Sends transactional email via Gmail SMTP or Brevo API.
+ * Tries Brevo first (if configured), then falls back to Gmail SMTP.
+ * Works with every existing call site without changes.
  */
 function send_smtp_mail(string $toEmail, string $toName, string $subject, string $bodyText): bool {
     $getEnv = function (string $name, string $fallback = ''): string {
@@ -30,18 +28,27 @@ function send_smtp_mail(string $toEmail, string $toName, string $subject, string
     $configPath = __DIR__ . '/mail_config.php';
     $config = file_exists($configPath) ? (array) require $configPath : [];
 
+    // Try Brevo first (if API key is configured)
+    $brevoApiKey = $getEnv('BREVO_API_KEY', $config['brevo_api_key'] ?? '');
+    if ($brevoApiKey !== '') {
+        if (send_via_brevo($toEmail, $toName, $subject, $bodyText, $getEnv, $config)) {
+            return true;
+        }
+    }
+
+    // Fall back to Gmail SMTP
+    return send_via_gmail_smtp($toEmail, $toName, $subject, $bodyText, $getEnv, $config);
+}
+
+/**
+ * Send email via Brevo API
+ */
+function send_via_brevo(string $toEmail, string $toName, string $subject, string $bodyText, callable $getEnv, array $config): bool {
     $apiKey      = $getEnv('BREVO_API_KEY', $config['brevo_api_key'] ?? '');
     $fromAddress = $getEnv('MAIL_FROM_ADDRESS', $getEnv('MAIL_FROM_EMAIL', $config['from_address'] ?? ''));
     $fromName    = $getEnv('MAIL_FROM_NAME', $config['from_name'] ?? 'PaddleGround');
 
     if ($apiKey === '' || $fromAddress === '') {
-        $errorMsg = 'Missing BREVO_API_KEY or MAIL_FROM_ADDRESS. Set these in Render env vars, or in PHPMailer/mail_config.php.';
-        error_log("Mailer Error: {$errorMsg}");
-        file_put_contents(
-            __DIR__ . '/mail_error.log',
-            date('Y-m-d H:i:s') . " - ERROR - " . $errorMsg . "\n",
-            FILE_APPEND
-        );
         return false;
     }
 
@@ -72,28 +79,63 @@ function send_smtp_mail(string $toEmail, string $toName, string $subject, string
     curl_close($ch);
 
     if ($curlError !== '') {
-        $errorMsg = "cURL error contacting Brevo: {$curlError}";
-        error_log("Mailer Error: {$errorMsg}");
+        error_log("Brevo cURL error: {$curlError}");
+        return false;
+    }
+
+    if ($httpCode >= 200 && $httpCode < 300) {
+        error_log("Email sent via Brevo to {$toEmail}");
+        return true;
+    }
+
+    error_log("Brevo API returned HTTP {$httpCode}: {$response}");
+    return false;
+}
+
+/**
+ * Send email via Gmail SMTP using PHPMailer
+ */
+function send_via_gmail_smtp(string $toEmail, string $toName, string $subject, string $bodyText, callable $getEnv, array $config): bool {
+    $mailHost   = $getEnv('MAIL_HOST', $config['mail_host'] ?? 'smtp.gmail.com');
+    $mailPort   = (int) $getEnv('MAIL_PORT', $config['mail_port'] ?? '587');
+    $mailUser   = $getEnv('MAIL_USERNAME', $config['smtp_username'] ?? '');
+    $mailPass   = $getEnv('MAIL_PASSWORD', $config['smtp_password'] ?? '');
+    $fromEmail  = $getEnv('MAIL_FROM_EMAIL', $config['mail_from_email'] ?? $mailUser);
+    $fromName   = $getEnv('MAIL_FROM_NAME', $config['from_name'] ?? 'PaddleGround');
+    $encryption = strtolower($getEnv('MAIL_ENCRYPTION', $config['mail_encryption'] ?? 'tls'));
+
+    if ($mailUser === '' || $mailPass === '') {
+        error_log("Mailer Error: Missing MAIL_USERNAME or MAIL_PASSWORD in .env or mail_config.php");
+        return false;
+    }
+
+    $mail = new PHPMailer(true);
+    try {
+        $mail->isSMTP();
+        $mail->Host       = $mailHost;
+        $mail->SMTPAuth   = true;
+        $mail->Username   = $mailUser;
+        $mail->Password   = $mailPass;
+        $mail->SMTPSecure = ($encryption === 'ssl') ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = $mailPort;
+
+        $mail->setFrom($fromEmail, $fromName);
+        $mail->addAddress($toEmail, $toName);
+
+        $mail->isHTML(false);
+        $mail->Subject = $subject;
+        $mail->Body    = $bodyText;
+
+        $mail->send();
+        error_log("Email sent via Gmail SMTP to {$toEmail}");
+        return true;
+    } catch (Exception $e) {
+        error_log("Gmail SMTP Error: " . $mail->ErrorInfo . ' | ' . $e->getMessage());
         file_put_contents(
             __DIR__ . '/mail_error.log',
-            date('Y-m-d H:i:s') . " - ERROR - " . $errorMsg . "\n",
+            date('Y-m-d H:i:s') . " - ERROR - " . $mail->ErrorInfo . "\n",
             FILE_APPEND
         );
         return false;
     }
-
-    // Brevo returns 201 Created on success.
-    if ($httpCode >= 200 && $httpCode < 300) {
-        return true;
-    }
-
-    $errorMsg = "Brevo API returned HTTP {$httpCode}: {$response}";
-    error_log("Mailer Error: {$errorMsg}");
-    file_put_contents(
-        __DIR__ . '/mail_error.log',
-        date('Y-m-d H:i:s') . " - ERROR - " . $errorMsg . "\n",
-        FILE_APPEND
-    );
-
-    return false;
 }
