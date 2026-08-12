@@ -1,6 +1,17 @@
 <?php
 require_once __DIR__ . '/../config/env.php';
-require_once __DIR__ . '/../vendor/autoload.php';
+
+// Prefer Composer when it is installed, but this project also ships PHPMailer
+// in this directory. Requiring vendor/autoload.php unconditionally makes every
+// notification fail with a fatal error on XAMPP installations without vendor/.
+$composerAutoload = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($composerAutoload)) {
+    require_once $composerAutoload;
+} else {
+    require_once __DIR__ . '/src/Exception.php';
+    require_once __DIR__ . '/src/PHPMailer.php';
+    require_once __DIR__ . '/src/SMTP.php';
+}
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
