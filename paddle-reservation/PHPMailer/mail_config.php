@@ -1,6 +1,7 @@
 <?php
+
 return [
-    'smtp_username' => 'escartinalex8@gmail.com', // <-- put the ACTUAL Gmail address here
-    'smtp_password' => 'qehynubkhpgnkqiu',
+    'smtp_username' => getenv('SMTP_USERNAME'),
+    'smtp_password' => getenv('SMTP_PASSWORD'),
     'from_name'     => 'paddleground',
 ];
