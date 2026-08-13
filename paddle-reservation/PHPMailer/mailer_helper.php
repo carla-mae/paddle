@@ -17,8 +17,7 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 /**
- * Sends transactional email via Gmail SMTP or Brevo API.
- * Tries Brevo first (if configured), then falls back to Gmail SMTP.
+ * Sends transactional email via Gmail SMTP.
  * Works with every existing call site without changes.
  */
 function send_smtp_mail(string $toEmail, string $toName, string $subject, string $bodyText): bool {
@@ -39,75 +38,8 @@ function send_smtp_mail(string $toEmail, string $toName, string $subject, string
     $configPath = __DIR__ . '/mail_config.php';
     $config = file_exists($configPath) ? (array) require $configPath : [];
 
-    // Debug: Log which variables are being found
-    file_put_contents(
-        __DIR__ . '/mail_error.log',
-        date('Y-m-d H:i:s') . " - DEBUG - Loading env vars from: getenv(), \$_ENV, \$_SERVER, and {$configPath}\n",
-        FILE_APPEND
-    );
-
-    // Try Brevo first (if API key is configured)
-    $brevoApiKey = $getEnv('BREVO_API_KEY', $config['brevo_api_key'] ?? '');
-    if ($brevoApiKey !== '') {
-        if (send_via_brevo($toEmail, $toName, $subject, $bodyText, $getEnv, $config)) {
-            return true;
-        }
-    }
-
-    // Fall back to Gmail SMTP
+    // Send via Gmail SMTP
     return send_via_gmail_smtp($toEmail, $toName, $subject, $bodyText, $getEnv, $config);
-}
-
-/**
- * Send email via Brevo API
- */
-function send_via_brevo(string $toEmail, string $toName, string $subject, string $bodyText, callable $getEnv, array $config): bool {
-    $apiKey      = $getEnv('BREVO_API_KEY', $config['brevo_api_key'] ?? '');
-    $fromAddress = $getEnv('MAIL_FROM_ADDRESS', $getEnv('MAIL_FROM_EMAIL', $config['from_address'] ?? ''));
-    $fromName    = $getEnv('MAIL_FROM_NAME', $config['from_name'] ?? 'PaddleGround');
-
-    if ($apiKey === '' || $fromAddress === '') {
-        return false;
-    }
-
-    $payload = json_encode([
-        'sender'      => ['name' => $fromName, 'email' => $fromAddress],
-        'to'          => [['email' => $toEmail, 'name' => $toName]],
-        'subject'     => $subject,
-        'textContent' => $bodyText,
-    ]);
-
-    $ch = curl_init('https://api.brevo.com/v3/smtp/email');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $payload,
-        CURLOPT_HTTPHEADER     => [
-            'accept: application/json',
-            'api-key: ' . $apiKey,
-            'content-type: application/json',
-        ],
-        CURLOPT_TIMEOUT        => 15,
-        CURLOPT_CONNECTTIMEOUT => 10,
-    ]);
-
-    $response  = curl_exec($ch);
-    $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
-
-    if ($curlError !== '') {
-        error_log("Brevo cURL error: {$curlError}");
-        return false;
-    }
-
-    if ($httpCode >= 200 && $httpCode < 300) {
-        error_log("Email sent via Brevo to {$toEmail}");
-        return true;
-    }
-
-    error_log("Brevo API returned HTTP {$httpCode}: {$response}");
-    return false;
 }
 
 /**
