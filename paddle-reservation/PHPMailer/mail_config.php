@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'smtp_username' => getenv('SMTP_USERNAME'),
-    'smtp_password' => getenv('SMTP_PASSWORD'),
-    'from_name'     => 'paddleground',
+    'smtp_username' => 'escartinalex8@gmail.com',
+    'smtp_password' => 'rbmlqnthslokwrpy',
+    'from_name'     => 'ThePaddleGround',
 ];
