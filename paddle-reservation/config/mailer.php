@@ -12,7 +12,7 @@ function send_verification_email(string $toEmail, string $toName, string $code):
         $mail->Host       = $_ENV['MAIL_HOST'] ?? getenv('MAIL_HOST') ?? 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = $_ENV['MAIL_USERNAME'] ?? getenv('MAIL_USERNAME');
-        $mail->Password   = $_ENV['MAIL_APP_PASSWORD'] ?? getenv('MAIL_APP_PASSWORD');
+        $mail->Password   = $_ENV['MAIL_PASSWORD'] ?? getenv('MAIL_PASSWORD');
         $mail->SMTPSecure = (strtolower($_ENV['MAIL_ENCRYPTION'] ?? getenv('MAIL_ENCRYPTION') ?? 'tls') === 'ssl') ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = intval($_ENV['MAIL_PORT'] ?? getenv('MAIL_PORT') ?? 587);
 
