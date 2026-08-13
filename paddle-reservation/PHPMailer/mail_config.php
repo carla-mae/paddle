@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'smtp_username' => 'escartinalex8@gmail.com',
-    'smtp_password' => 'rbmlqnthslokwrpy',
-    'from_name'     => 'ThePaddleGround',
+    'smtp_username' => 'carlaniwang1728@gmail.com',
+    'smtp_password' => 'cjqioylbscplthsn',
+    'from_name'     => 'thepaddleground',
 ];
