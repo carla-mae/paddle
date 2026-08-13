@@ -39,6 +39,13 @@ function send_smtp_mail(string $toEmail, string $toName, string $subject, string
     $configPath = __DIR__ . '/mail_config.php';
     $config = file_exists($configPath) ? (array) require $configPath : [];
 
+    // Debug: Log which variables are being found
+    file_put_contents(
+        __DIR__ . '/mail_error.log',
+        date('Y-m-d H:i:s') . " - DEBUG - Loading env vars from: getenv(), \$_ENV, \$_SERVER, and {$configPath}\n",
+        FILE_APPEND
+    );
+
     // Try Brevo first (if API key is configured)
     $brevoApiKey = $getEnv('BREVO_API_KEY', $config['brevo_api_key'] ?? '');
     if ($brevoApiKey !== '') {
@@ -117,18 +124,41 @@ function send_via_gmail_smtp(string $toEmail, string $toName, string $subject, s
 
     if ($mailUser === '' || $mailPass === '') {
         error_log("Mailer Error: Missing MAIL_USERNAME or MAIL_PASSWORD in .env or mail_config.php");
+        file_put_contents(
+            __DIR__ . '/mail_error.log',
+            date('Y-m-d H:i:s') . " - CONFIG ERROR - Missing MAIL_USERNAME or MAIL_PASSWORD\n",
+            FILE_APPEND
+        );
         return false;
     }
 
     $mail = new PHPMailer(true);
     try {
         $mail->isSMTP();
+        $mail->SMTPDebug = 2; // Enable detailed debug output
+        $mail->Debugoutput = function ($str, $level) {
+            file_put_contents(
+                __DIR__ . '/mail_error.log',
+                date('Y-m-d H:i:s') . " - SMTP DEBUG [{$level}] - " . $str . "\n",
+                FILE_APPEND
+            );
+        };
+        
         $mail->Host       = $mailHost;
         $mail->SMTPAuth   = true;
         $mail->Username   = $mailUser;
         $mail->Password   = $mailPass;
         $mail->SMTPSecure = ($encryption === 'ssl') ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = $mailPort;
+        $mail->Timeout    = 15; // 15 second timeout for connection
+        $mail->SMTPKeepAlive = false; // Close connection after sending
+
+        // Log configuration details
+        file_put_contents(
+            __DIR__ . '/mail_error.log',
+            date('Y-m-d H:i:s') . " - CONFIG - Host: {$mailHost}, Port: {$mailPort}, User: {$mailUser}, Encryption: {$encryption}\n",
+            FILE_APPEND
+        );
 
         $mail->setFrom($fromEmail, $fromName);
         $mail->addAddress($toEmail, $toName);
@@ -139,12 +169,17 @@ function send_via_gmail_smtp(string $toEmail, string $toName, string $subject, s
 
         $mail->send();
         error_log("Email sent via Gmail SMTP to {$toEmail}");
+        file_put_contents(
+            __DIR__ . '/mail_error.log',
+            date('Y-m-d H:i:s') . " - SUCCESS - Email sent to {$toEmail}\n",
+            FILE_APPEND
+        );
         return true;
     } catch (Exception $e) {
         error_log("Gmail SMTP Error: " . $mail->ErrorInfo . ' | ' . $e->getMessage());
         file_put_contents(
             __DIR__ . '/mail_error.log',
-            date('Y-m-d H:i:s') . " - ERROR - " . $mail->ErrorInfo . "\n",
+            date('Y-m-d H:i:s') . " - ERROR - PHPMailer: " . $mail->ErrorInfo . " | Exception: " . $e->getMessage() . "\n",
             FILE_APPEND
         );
         return false;
